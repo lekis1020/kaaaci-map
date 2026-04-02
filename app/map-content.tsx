@@ -34,6 +34,20 @@ function regionLabel(r: string) {
   return r.replace("특별시", "").replace("광역시", "").replace("도", "");
 }
 
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const NEARBY_RADIUS_KM = 20;
+
 export default function AllergyMapContent() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -47,6 +61,10 @@ export default function AllergyMapContent() {
   const [firazyrOnly, setFirazyrOnly] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [nearbyMode, setNearbyMode] = useState(false);
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
   const regions = useMemo(
     () => [...new Set(HOSPITALS.map((h) => h.region))].sort(),
@@ -54,7 +72,7 @@ export default function AllergyMapContent() {
   );
 
   const filtered = useMemo(() => {
-    return HOSPITALS.filter((h) => {
+    let results = HOSPITALS.filter((h) => {
       if (activeRegions.size && !activeRegions.has(h.region)) return false;
       if (activeDepts.size && !h.depts.some((d) => activeDepts.has(d)))
         return false;
@@ -67,9 +85,20 @@ export default function AllergyMapContent() {
           `${h.name} ${h.region} ${h.district} ${h.address} ${h.tel} ${allDocs}`.toLowerCase();
         if (!searchable.includes(s)) return false;
       }
+      if (nearbyMode && userLocation) {
+        const dist = getDistanceKm(userLocation.lat, userLocation.lng, h.lat, h.lng);
+        if (dist > NEARBY_RADIUS_KM) return false;
+      }
       return true;
     });
-  }, [searchText, activeRegions, activeDepts, jextOnly, firazyrOnly]);
+    if (nearbyMode && userLocation) {
+      results.sort((a, b) =>
+        getDistanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) -
+        getDistanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng)
+      );
+    }
+    return results;
+  }, [searchText, activeRegions, activeDepts, jextOnly, firazyrOnly, nearbyMode, userLocation]);
 
   const stats = useMemo(() => {
     const totalDocs = filtered.reduce(
@@ -129,8 +158,8 @@ export default function AllergyMapContent() {
 
       const marker = L.marker([h.lat, h.lng], { icon }).addTo(map);
 
-      let popupHtml = `<div style="font-family:system-ui,sans-serif;min-width:220px">`;
-      popupHtml += `<div style="font-weight:700;font-size:14px;margin-bottom:4px">${h.name}</div>`;
+      let popupHtml = `<div style="font-family:system-ui,sans-serif;min-width:180px;max-width:260px">`;
+      popupHtml += `<div style="font-weight:700;font-size:14px;margin-bottom:4px;word-break:keep-all">${h.name}</div>`;
       popupHtml += `<div style="font-size:11px;color:#64748b;margin-bottom:3px">${h.address}</div>`;
       if (h.tel)
         popupHtml += `<div style="font-size:11px;color:#64748b;margin-bottom:6px">📞 ${h.tel}</div>`;
@@ -145,7 +174,8 @@ export default function AllergyMapContent() {
         popupHtml += `<div style="margin-top:4px"><span style="background:#ecfeff;color:#155e75;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600">💊 Firazyr® 처방</span></div>`;
       popupHtml += `</div>`;
 
-      marker.bindPopup(popupHtml, { maxWidth: 300 });
+      const isMobile = window.innerWidth < 768;
+      marker.bindPopup(popupHtml, { maxWidth: isMobile ? 260 : 300 });
 
       const globalIdx = HOSPITALS.indexOf(h);
       marker.on("click", () => setSelectedIdx(globalIdx));
@@ -208,6 +238,59 @@ export default function AllergyMapContent() {
     });
   }, []);
 
+  const handleLocateMe = useCallback(() => {
+    if (!navigator.geolocation) {
+      alert("이 브라우저에서는 위치 서비스를 지원하지 않습니다.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setUserLocation({ lat, lng });
+        setNearbyMode(true);
+        setLocating(false);
+
+        const map = mapInstanceRef.current;
+        if (map) {
+          // Remove old user marker
+          if (userMarkerRef.current) {
+            map.removeLayer(userMarkerRef.current);
+          }
+          const userIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div style="width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 2px #3b82f6,0 2px 6px rgba(0,0,0,0.3)"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          userMarkerRef.current = L.marker([lat, lng], { icon: userIcon })
+            .addTo(map)
+            .bindPopup(`<div style="font-family:system-ui,sans-serif;font-size:13px;font-weight:600">📍 현재 위치</div>`);
+          map.setView([lat, lng], 12);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          alert("위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해 주세요.");
+        } else {
+          alert("현재 위치를 가져올 수 없습니다. 다시 시도해 주세요.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  const clearNearbyMode = useCallback(() => {
+    setNearbyMode(false);
+    setUserLocation(null);
+    const map = mapInstanceRef.current;
+    if (map && userMarkerRef.current) {
+      map.removeLayer(userMarkerRef.current);
+      userMarkerRef.current = null;
+    }
+  }, []);
+
   // Scroll selected card into view
   useEffect(() => {
     if (selectedIdx < 0 || !listRef.current) return;
@@ -233,7 +316,7 @@ export default function AllergyMapContent() {
       <div className="fixed inset-0 z-10 flex flex-col md:flex-row bg-background">
         {/* Mobile toggle */}
         <button
-          className="absolute left-3 md:hidden z-[1000] rounded-lg bg-white px-3 py-2 text-xs font-medium shadow-lg border dark:bg-gray-800 dark:border-gray-600"
+          className="absolute left-1/2 -translate-x-1/2 md:hidden z-[1000] rounded-full bg-white px-4 py-2 text-xs font-semibold shadow-lg border dark:bg-gray-800 dark:border-gray-600"
           style={{ top: "max(0.75rem, env(safe-area-inset-top, 0.75rem))" }}
           onClick={() => setPanelOpen(!panelOpen)}
         >
@@ -373,6 +456,26 @@ export default function AllergyMapContent() {
               />
               파라지르(Firazyr®) 처방 가능 병원만 보기
             </label>
+
+            {/* Nearby location button */}
+            <div className="pt-1">
+              {nearbyMode ? (
+                <button
+                  onClick={clearNearbyMode}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  📍 내 주변 {NEARBY_RADIUS_KM}km 검색 중 — 해제
+                </button>
+              ) : (
+                <button
+                  onClick={handleLocateMe}
+                  disabled={locating}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800 transition-colors disabled:opacity-50"
+                >
+                  {locating ? "위치 확인 중..." : "📍 내 주변 병원 찾기"}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Result Count */}
@@ -413,8 +516,13 @@ export default function AllergyMapContent() {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground mb-1">
-                    {h.region} {h.district}
+                  <div className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <span>{h.region} {h.district}</span>
+                    {nearbyMode && userLocation && (
+                      <span className="text-blue-600 font-semibold">
+                        {getDistanceKm(userLocation.lat, userLocation.lng, h.lat, h.lng).toFixed(1)}km
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-muted-foreground mb-1.5">
                     📍 {h.address}
@@ -465,6 +573,39 @@ export default function AllergyMapContent() {
           }`}
         >
           <div ref={mapRef} className="w-full h-full" />
+
+          {/* Locate me button */}
+          <button
+            onClick={handleLocateMe}
+            disabled={locating}
+            className="absolute top-20 right-3 z-[1000] w-10 h-10 bg-white rounded-lg shadow-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600"
+            title="현재 위치로 이동"
+          >
+            {locating ? (
+              <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v4m0 12v4m10-10h-4M6 12H2" />
+              </svg>
+            )}
+          </button>
+
+          {/* Nearby mode indicator */}
+          {nearbyMode && (
+            <div className="absolute top-20 left-3 z-[1000] bg-blue-600 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-medium flex items-center gap-2">
+              📍 반경 {NEARBY_RADIUS_KM}km 내 병원
+              <button
+                onClick={clearNearbyMode}
+                className="ml-1 w-5 h-5 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 text-[10px]"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Legend */}
           <div className="absolute bottom-6 right-3 z-[1000] bg-card p-3 rounded-lg shadow-lg text-[11px] border border-border">

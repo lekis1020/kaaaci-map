@@ -188,6 +188,22 @@ html, body {
   }
 }
 
+/* Leaflet popup mobile fix */
+@media (max-width: 768px) {
+  .leaflet-popup-content-wrapper {
+    max-width: calc(100vw - 60px) !important;
+  }
+  .leaflet-popup-content {
+    max-width: calc(100vw - 90px) !important;
+    margin: 10px !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  .leaflet-popup {
+    max-width: calc(100vw - 40px) !important;
+  }
+}
+
 /* Scrollbar styles */
 ::-webkit-scrollbar {
   width: 6px;
