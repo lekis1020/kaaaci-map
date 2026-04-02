@@ -64,7 +64,10 @@ export default function AllergyMapContent() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [nearbyMode, setNearbyMode] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(true);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const regions = useMemo(
     () => [...new Set(HOSPITALS.map((h) => h.region))].sort(),
@@ -238,6 +241,30 @@ export default function AllergyMapContent() {
     });
   }, []);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (activeRegions.size) count += activeRegions.size;
+    if (activeDepts.size) count += activeDepts.size;
+    if (jextOnly) count++;
+    if (firazyrOnly) count++;
+    if (nearbyMode) count++;
+    if (searchText) count++;
+    return count;
+  }, [activeRegions, activeDepts, jextOnly, firazyrOnly, nearbyMode, searchText]);
+
+  const handleFilterTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleFilterTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaY) > 50) {
+      setFilterOpen(deltaY > 0);
+    }
+    touchStartY.current = null;
+  }, []);
+
   const handleLocateMe = useCallback(() => {
     if (!navigator.geolocation) {
       alert("이 브라우저에서는 위치 서비스를 지원하지 않습니다.");
@@ -360,126 +387,164 @@ export default function AllergyMapContent() {
             개
           </div>
 
-          {/* Search & Filters */}
-          <div className="px-4 py-3 border-b border-border space-y-2.5">
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="병원명, 의사명, 지역, 주소 검색..."
-                className="w-full py-2 pl-9 pr-3 border border-border rounded-lg text-sm bg-muted/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
-            </div>
-
-            {/* Region Filter */}
-            <div>
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                지역 필터
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {regions.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => toggleRegion(r)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                      activeRegions.has(r)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-card border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                    }`}
-                  >
-                    {regionLabel(r)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dept Filter */}
-            <div>
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                진료과 필터
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {DEPT_ORDER.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => toggleDept(d)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                      activeDepts.has(d)
-                        ? "text-white border-transparent"
-                        : "bg-card border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                    }`}
-                    style={
-                      activeDepts.has(d)
-                        ? {
-                            backgroundColor: DEPT_COLORS[d],
-                            borderColor: DEPT_COLORS[d],
-                          }
-                        : undefined
-                    }
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Jext Toggle */}
-            <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={jextOnly}
-                onChange={(e) => setJextOnly(e.target.checked)}
-                className="accent-blue-600"
-              />
-              젝스트(Jext®) 처방 가능 병원만 보기
-            </label>
-            <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={firazyrOnly}
-                onChange={(e) => setFirazyrOnly(e.target.checked)}
-                className="accent-cyan-700"
-              />
-              파라지르(Firazyr®) 처방 가능 병원만 보기
-            </label>
-
-            {/* Nearby location button */}
-            <div className="pt-1">
-              {nearbyMode ? (
-                <button
-                  onClick={clearNearbyMode}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          {/* Search & Filters - Collapsible on mobile */}
+          <div className="border-b border-border">
+            {/* Toggle handle - mobile only */}
+            <button
+              className="w-full md:hidden flex items-center justify-between px-4 py-2 bg-muted/50 active:bg-muted/80 transition-colors"
+              onClick={() => setFilterOpen(!filterOpen)}
+              onTouchStart={handleFilterTouchStart}
+              onTouchEnd={handleFilterTouchEnd}
+            >
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <svg
+                  className={`h-3.5 w-3.5 transition-transform duration-200 ${filterOpen ? "rotate-180" : ""}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
                 >
-                  📍 내 주변 {NEARBY_RADIUS_KM}km 검색 중 — 해제
-                </button>
-              ) : (
-                <button
-                  onClick={handleLocateMe}
-                  disabled={locating}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800 transition-colors disabled:opacity-50"
-                >
-                  {locating ? "위치 확인 중..." : "📍 내 주변 병원 찾기"}
-                </button>
-              )}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                검색 및 필터
+                {!filterOpen && activeFilterCount > 0 && (
+                  <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full w-4.5 h-4.5 flex items-center justify-center leading-none px-1.5 py-0.5">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                검색 결과: <span className="font-semibold text-blue-600">{filtered.length}</span>개 병원
+              </div>
+            </button>
+
+            {/* Collapsible filter content */}
+            <div
+              ref={filterRef}
+              className={`overflow-hidden transition-all duration-300 ease-in-out md:!max-h-none md:!opacity-100 ${
+                filterOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+              onTouchStart={handleFilterTouchStart}
+              onTouchEnd={handleFilterTouchEnd}
+            >
+              <div className="px-4 py-3 space-y-2.5">
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="병원명, 의사명, 지역, 주소 검색..."
+                    className="w-full py-2 pl-9 pr-3 border border-border rounded-lg text-sm bg-muted/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                  />
+                </div>
+
+                {/* Region Filter */}
+                <div>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    지역 필터
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {regions.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => toggleRegion(r)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                          activeRegions.has(r)
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-card border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        }`}
+                      >
+                        {regionLabel(r)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dept Filter */}
+                <div>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    진료과 필터
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEPT_ORDER.map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => toggleDept(d)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                          activeDepts.has(d)
+                            ? "text-white border-transparent"
+                            : "bg-card border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        }`}
+                        style={
+                          activeDepts.has(d)
+                            ? {
+                                backgroundColor: DEPT_COLORS[d],
+                                borderColor: DEPT_COLORS[d],
+                              }
+                            : undefined
+                        }
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Jext Toggle */}
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={jextOnly}
+                    onChange={(e) => setJextOnly(e.target.checked)}
+                    className="accent-blue-600"
+                  />
+                  젝스트(Jext®) 처방 가능 병원만 보기
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={firazyrOnly}
+                    onChange={(e) => setFirazyrOnly(e.target.checked)}
+                    className="accent-cyan-700"
+                  />
+                  파라지르(Firazyr®) 처방 가능 병원만 보기
+                </label>
+
+                {/* Nearby location button */}
+                <div className="pt-1">
+                  {nearbyMode ? (
+                    <button
+                      onClick={clearNearbyMode}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    >
+                      📍 내 주변 {NEARBY_RADIUS_KM}km 검색 중 — 해제
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleLocateMe}
+                      disabled={locating}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800 transition-colors disabled:opacity-50"
+                    >
+                      {locating ? "위치 확인 중..." : "📍 내 주변 병원 찾기"}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Result Count */}
-          <div className="px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/50 border-b border-border">
+          {/* Result Count - always visible, hidden on mobile when filter toggle is visible */}
+          <div className="hidden md:block px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/50 border-b border-border">
             검색 결과: {filtered.length}개 병원
           </div>
 
