@@ -16,6 +16,7 @@ interface Hospital {
   lat: number;
   lng: number;
   jext: boolean;
+  firazyr?: boolean;
 }
 
 const HOSPITALS = hospitalsData as Hospital[];
@@ -43,6 +44,7 @@ export default function AllergyMapContent() {
   const [activeRegions, setActiveRegions] = useState<Set<string>>(new Set());
   const [activeDepts, setActiveDepts] = useState<Set<string>>(new Set());
   const [jextOnly, setJextOnly] = useState(false);
+  const [firazyrOnly, setFirazyrOnly] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -57,6 +59,7 @@ export default function AllergyMapContent() {
       if (activeDepts.size && !h.depts.some((d) => activeDepts.has(d)))
         return false;
       if (jextOnly && !h.jext) return false;
+      if (firazyrOnly && !h.firazyr) return false;
       if (searchText) {
         const s = searchText.toLowerCase();
         const allDocs = Object.values(h.doctors).flat().join(" ").toLowerCase();
@@ -66,7 +69,7 @@ export default function AllergyMapContent() {
       }
       return true;
     });
-  }, [searchText, activeRegions, activeDepts, jextOnly]);
+  }, [searchText, activeRegions, activeDepts, jextOnly, firazyrOnly]);
 
   const stats = useMemo(() => {
     const totalDocs = filtered.reduce(
@@ -74,9 +77,11 @@ export default function AllergyMapContent() {
       0
     );
     const jextCount = filtered.filter((h) => h.jext).length;
+    const firazyrCount = filtered.filter((h) => h.firazyr).length;
     return {
       totalDocs,
       jextCount,
+      firazyrCount,
       shown: filtered.length,
       total: HOSPITALS.length,
     };
@@ -136,6 +141,8 @@ export default function AllergyMapContent() {
       });
       if (h.jext)
         popupHtml += `<div style="margin-top:4px"><span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600">💉 Jext® 처방</span></div>`;
+      if (h.firazyr)
+        popupHtml += `<div style="margin-top:4px"><span style="background:#ecfeff;color:#155e75;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600">💊 Firazyr® 처방</span></div>`;
       popupHtml += `</div>`;
 
       marker.bindPopup(popupHtml, { maxWidth: 300 });
@@ -263,6 +270,10 @@ export default function AllergyMapContent() {
             <span className="font-semibold text-blue-600">
               {stats.jextCount}
             </span>
+            개 · Firazyr®{" "}
+            <span className="font-semibold text-blue-600">
+              {stats.firazyrCount}
+            </span>
             개
           </div>
 
@@ -353,6 +364,15 @@ export default function AllergyMapContent() {
               />
               젝스트(Jext®) 처방 가능 병원만 보기
             </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={firazyrOnly}
+                onChange={(e) => setFirazyrOnly(e.target.checked)}
+                className="accent-cyan-700"
+              />
+              파라지르(Firazyr®) 처방 가능 병원만 보기
+            </label>
           </div>
 
           {/* Result Count */}
@@ -385,6 +405,11 @@ export default function AllergyMapContent() {
                     {h.jext && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded text-[10px] font-semibold">
                         💉 Jext®
+                      </span>
+                    )}
+                    {h.firazyr && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 rounded text-[10px] font-semibold">
+                        💊 Firazyr®
                       </span>
                     )}
                   </div>
