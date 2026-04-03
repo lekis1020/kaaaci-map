@@ -64,6 +64,7 @@ export default function AllergyMapContent() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [nearbyMode, setNearbyMode] = useState(false);
+  const [textScale, setTextScale] = useState(2);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
   const regions = useMemo(
@@ -72,7 +73,7 @@ export default function AllergyMapContent() {
   );
 
   const filtered = useMemo(() => {
-    let results = HOSPITALS.filter((h) => {
+    const results = HOSPITALS.filter((h) => {
       if (activeRegions.size && !activeRegions.has(h.region)) return false;
       if (activeDepts.size && !h.depts.some((d) => activeDepts.has(d)))
         return false;
@@ -476,17 +477,49 @@ export default function AllergyMapContent() {
                 </button>
               )}
             </div>
+
+            {/* Text size control */}
+            <div className="pt-1">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                글자 크기
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: "기본", value: 1.5 },
+                  { label: "2배", value: 2 },
+                  { label: "크게", value: 2.5 },
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    onClick={() => setTextScale(option.value)}
+                    className={`py-1.5 rounded-md border text-[11px] font-medium transition-colors ${
+                      textScale === option.value
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-card border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Result Count */}
-          <div className="px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/50 border-b border-border">
+          <div
+            className="px-4 py-1.5 text-muted-foreground bg-muted/50 border-b border-border"
+            style={{ fontSize: `${11 * textScale}px` }}
+          >
             검색 결과: {filtered.length}개 병원
           </div>
 
           {/* Hospital List */}
           <div ref={listRef} className="allergy-map-scroll flex-1 min-h-0 overflow-y-auto">
             {filtered.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              <div
+                className="px-4 py-8 text-center text-muted-foreground"
+                style={{ fontSize: `${14 * textScale}px` }}
+              >
                 검색 결과가 없습니다.
               </div>
             )}
@@ -504,19 +537,28 @@ export default function AllergyMapContent() {
                   }`}
                 >
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-sm font-semibold">{h.name}</span>
+                    <span className="font-semibold" style={{ fontSize: `${14 * textScale}px` }}>{h.name}</span>
                     {h.jext && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded text-[10px] font-semibold">
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded font-semibold"
+                        style={{ fontSize: `${10 * textScale}px` }}
+                      >
                         💉 Jext®
                       </span>
                     )}
                     {h.firazyr && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 rounded text-[10px] font-semibold">
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 rounded font-semibold"
+                        style={{ fontSize: `${10 * textScale}px` }}
+                      >
                         💊 Firazyr®
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <div
+                    className="text-muted-foreground mb-1 flex items-center gap-1.5"
+                    style={{ fontSize: `${11 * textScale}px` }}
+                  >
                     <span>{h.region} {h.district}</span>
                     {nearbyMode && userLocation && (
                       <span className="text-blue-600 font-semibold">
@@ -524,7 +566,7 @@ export default function AllergyMapContent() {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground mb-1.5">
+                  <div className="text-muted-foreground mb-1.5" style={{ fontSize: `${11 * textScale}px` }}>
                     📍 {h.address}
                   </div>
                   <div className="flex flex-wrap gap-1 mb-1.5">
@@ -532,15 +574,15 @@ export default function AllergyMapContent() {
                       h.doctors[d] ? (
                         <span
                           key={d}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                          style={{ backgroundColor: DEPT_COLORS[d] }}
+                          className="px-2 py-0.5 rounded-full font-medium text-white"
+                          style={{ fontSize: `${10 * textScale}px`, backgroundColor: DEPT_COLORS[d] }}
                         >
                           {d} ({h.doctors[d].length})
                         </span>
                       ) : null
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  <div className="text-muted-foreground leading-relaxed" style={{ fontSize: `${11 * textScale}px` }}>
                     {DEPT_ORDER.map((d) =>
                       h.doctors[d] ? (
                         <div key={d}>
@@ -556,7 +598,7 @@ export default function AllergyMapContent() {
                     )}
                   </div>
                   {h.tel && (
-                    <div className="text-[11px] text-muted-foreground mt-1">
+                    <div className="text-muted-foreground mt-1" style={{ fontSize: `${11 * textScale}px` }}>
                       📞 {h.tel}
                     </div>
                   )}
@@ -608,13 +650,20 @@ export default function AllergyMapContent() {
           )}
 
           {/* Legend */}
-          <div className="absolute bottom-6 right-3 z-[1000] bg-card p-3 rounded-lg shadow-lg text-[11px] border border-border">
-            <div className="font-semibold mb-1.5">진료과 구분</div>
+          <div
+            className="absolute bottom-6 right-3 z-[1000] bg-card p-3 rounded-lg shadow-lg border border-border"
+            style={{ fontSize: `${11 * textScale}px` }}
+          >
+            <div className="font-semibold mb-1.5" style={{ fontSize: `${12 * textScale}px` }}>진료과 구분</div>
             {DEPT_ORDER.map((d) => (
               <div key={d} className="flex items-center gap-2 mb-0.5">
                 <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: DEPT_COLORS[d] }}
+                  className="rounded-full"
+                  style={{
+                    width: `${10 * Math.min(textScale, 2)}px`,
+                    height: `${10 * Math.min(textScale, 2)}px`,
+                    backgroundColor: DEPT_COLORS[d],
+                  }}
                 />
                 <span>{d === "내과" ? "내과 (알레르기내과)" : d}</span>
               </div>
