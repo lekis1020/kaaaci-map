@@ -90,5 +90,8 @@
   {"name":"가톨릭관동대학교 국제성모병원","region":"인천광역시","district":"서구","address":"인천광역시 서구 심곡로 100번길 25","depts":["내과"],"doctors":{"내과":["이용원"]},"tel":"1600-8291","lat":37.553,"lng":126.682,"jext":true,"firazyr":false},
   {"name":"김영효 이비인후과","region":"인천광역시","district":"연수구","address":"인천광역시 연수구 신송로 161","depts":["이비인후과"],"doctors":{"이비인후과":["김영효"]},"tel":"","lat":37.5665,"lng":126.978,"jext":false,"firazyr":false},
   {"name":"송도 서울삼성내과의원","region":"인천광역시","district":"연수구","address":"인천광역시 연수구 신송로 161","depts":["내과"],"doctors":{"내과":["하경원"]},"tel":"0507-1433-1933","lat":37.381,"lng":126.66,"jext":false,"firazyr":false},
-  {"name":"인하대학교병원","region":"인천광역시","district":"중구","address":"인천광역시 중구 인항로 27","depts":["내과","소아청소년과"],"doctors":{"내과":["김철우"],"소아청소년과":["김정희","김효빈","임대현"]},"tel":"032-890-2114","lat":37.4496,"lng":126.631,"jext":true,"firazyr":true}
+  {"name":"인하대학교병원","region":"인천광역시","district":"중구","address":"인천광역시 중구 인항로 27","depts":["내과","소아청소년과"],"doctors":{"내과":["김철우"],"소아청소년과":["김정희","김효빈","임대현"]},"tel":"032-890-2114","lat":37.4496,"lng":126.631,"jext":true,"firazyr":true},
+  {"name":"선내과의원","region":"제주특별자치도","district":"제주시","address":"제주특별자치도 제주시","depts":["내과"],"doctors":{"내과":["김미선"]},"tel":"064-722-6322","lat":33.4996,"lng":126.5312,"jext":false,"firazyr":false},
+  {"name":"제주대학교병원","region":"제주특별자치도","district":"제주시","address":"제주특별자치도 제주시 아란13길 15","depts":["내과","이비인후과"],"doctors":{"내과":["이재천"],"이비인후과":["김정홍","강주완"]},"tel":"064-717-1614","lat":33.4667,"lng":126.5492,"jext":false,"firazyr":false},
+  {"name":"주소아청소년과의원","region":"제주특별자치도","district":"제주시","address":"제주특별자치도 제주시","depts":["소아청소년과"],"doctors":{"소아청소년과":["김주화"]},"tel":"064-747-1136","lat":33.4996,"lng":126.5312,"jext":false,"firazyr":false}
 ]
